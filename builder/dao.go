@@ -328,7 +328,7 @@ func buildSelect(table string, ufields []string, groupBy string, uOrderBy []eleO
 		cond = fmt.Sprintf("%s ORDER BY %s", cond, str)
 	}
 	if nil != limit {
-		cond = fmt.Sprintf("%s LIMIT %d,%d", cond, limit.begin, limit.step)
+		cond = fmt.Sprintf("%s LIMIT %d OFFSET %d", cond, limit.begin, limit.step)
 	}
 	return cond, vals, nil
 }
