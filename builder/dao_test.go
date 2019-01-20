@@ -18,13 +18,14 @@ func TestEq(t *testing.T) {
 				"baz": 1,
 				"qq":  "ttx",
 			},
-			[]string{"baz=?", "foo=?", "qq=?"},
+			[]string{"baz=$1", "foo=$2", "qq=$3"},
 			[]interface{}{1, "bar", "ttx"},
 		},
 	}
 	ass := assert.New(t)
+	var placeHolderIndex int
 	for _, testCase := range testData {
-		cond, vals := Eq(testCase.in).Build()
+		cond, vals := Eq(testCase.in).Build(&placeHolderIndex)
 		ass.Equal(len(cond), len(vals))
 		ass.Equal(testCase.outCon, cond)
 		ass.Equal(testCase.outVal, vals)
@@ -42,13 +43,14 @@ func TestIn(t *testing.T) {
 				"foo": {"bar", "baz"},
 				"age": {5, 7, 9, 11},
 			},
-			outCond: []string{"age IN (?,?,?,?)", "foo IN (?,?)"},
+			outCond: []string{"age IN ($1,$2,$3,$4)", "foo IN ($5,$6)"},
 			outVals: []interface{}{5, 7, 9, 11, "bar", "baz"},
 		},
 	}
 	ass := assert.New(t)
+	var placeHolderIndex int
 	for _, testCase := range testData {
-		cond, vals := In(testCase.in).Build()
+		cond, vals := In(testCase.in).Build(&placeHolderIndex)
 		ass.Equal(testCase.outCond, cond)
 		ass.Equal(testCase.outVals, vals)
 	}
@@ -75,12 +77,14 @@ func TestAssembleExpression(t *testing.T) {
 		inField, inOp string
 		out           string
 	}{
-		{"foo", "=", "foo=?"},
-		{"qq", "<>", "qq<>?"},
+		{"foo", "=", "foo=$1"},
+		{"qq", "<>", "qq<>$2"},
 	}
 	ass := assert.New(t)
+	var placeHolderIndex int
 	for _, tc := range data {
-		ass.Equal(tc.out, assembleExpression(tc.inField, tc.inOp))
+		placeHolderIndex++
+		ass.Equal(tc.out, assembleExpression(tc.inField, tc.inOp, &placeHolderIndex))
 	}
 }
 
@@ -155,13 +159,14 @@ func TestWhereConnector(t *testing.T) {
 					"qq": {7, 8, 9},
 				}),
 			},
-			outStr:  "(a=? AND b=? AND foo!=? AND sex!=? AND qq IN (?,?,?))",
+			outStr:  "(a=$1 AND b=$2 AND foo!=$3 AND sex!=$4 AND qq IN ($5,$6,$7))",
 			outVals: []interface{}{"a", "b", 1, "male", 7, 8, 9},
 		},
 	}
 	ass := assert.New(t)
+	var placeHolderIndex int
 	for _, tc := range data {
-		actualStr, actualVals := whereConnector(tc.in...)
+		actualStr, actualVals := whereConnector(&placeHolderIndex, tc.in...)
 		ass.Equal(tc.outStr, actualStr)
 		ass.Equal(tc.outVals, actualVals)
 	}
@@ -191,7 +196,7 @@ func TestBuildInsert(t *testing.T) {
 					"bar": 6,
 				},
 			},
-			outStr:  "INSERT INTO tb1 (bar,foo) VALUES (?,?),(?,?),(?,?)",
+			outStr:  "INSERT INTO tb1 (bar,foo) VALUES ($1,$2),($3,$4),($5,$6)",
 			outVals: []interface{}{2, 1, 4, 3, 6, 5},
 			outErr:  nil,
 		},
@@ -227,7 +232,7 @@ func TestBuildUpdate(t *testing.T) {
 				"age":  23,
 			},
 			outErr:  nil,
-			outStr:  "UPDATE tb SET age=?,name=? WHERE (foo=? AND qq=?)",
+			outStr:  "UPDATE tb SET age=$1,name=$2 WHERE (foo=$3 AND qq=$4)",
 			outVals: []interface{}{23, "deen", "bar", 1},
 		},
 	}
@@ -257,7 +262,7 @@ func TestBuildDelete(t *testing.T) {
 					"baz": "tt",
 				}),
 			},
-			outStr:  "DELETE FROM tb WHERE (bar=? AND baz=? AND foo=?)",
+			outStr:  "DELETE FROM tb WHERE (bar=$1 AND baz=$2 AND foo=$3)",
 			outVals: []interface{}{2, "tt", 1},
 			outErr:  nil,
 		},
@@ -302,7 +307,7 @@ func TestBuildSelect(t *testing.T) {
 				step:  20,
 			},
 			outErr:  nil,
-			outStr:  "SELECT foo,bar FROM tb WHERE (bar=? AND foo=? AND qq IN (?,?,?)) ORDER BY foo DESC LIMIT 10,20",
+			outStr:  "SELECT foo,bar FROM tb WHERE (bar=$1 AND foo=$2 AND qq IN ($3,$4,$5)) ORDER BY foo DESC LIMIT 10,20",
 			outVals: []interface{}{2, 1, 4, 5, 6},
 		},
 	}

@@ -31,7 +31,7 @@ func TestBuildHaving(t *testing.T) {
 				selectField: []string{"count(*) as total"},
 			},
 			out: outStruct{
-				cond: "SELECT count(*) as total FROM tb WHERE (age>?)",
+				cond: "SELECT count(*) as total FROM tb WHERE (age>$1)",
 				vals: []interface{}{23},
 				err:  nil,
 			},
@@ -50,7 +50,7 @@ func TestBuildHaving(t *testing.T) {
 				selectField: []string{"name, count(price) as total"},
 			},
 			out: outStruct{
-				cond: "SELECT name, count(price) as total FROM tb WHERE (age>?) GROUP BY name HAVING (total>=? AND total<?)",
+				cond: "SELECT name, count(price) as total FROM tb WHERE (age>$1) GROUP BY name HAVING (total>=$2 AND total<$3)",
 				vals: []interface{}{23, 1000, 50000},
 				err:  nil,
 			},
@@ -68,7 +68,7 @@ func TestBuildHaving(t *testing.T) {
 				selectField: []string{"name, count(price) as total"},
 			},
 			out: outStruct{
-				cond: "SELECT name, count(price) as total FROM tb GROUP BY name HAVING (total>=? AND total<?)",
+				cond: "SELECT name, count(price) as total FROM tb GROUP BY name HAVING (total>=$1 AND total<$2)",
 				vals: []interface{}{1000, 50000},
 				err:  nil,
 			},
@@ -86,7 +86,7 @@ func TestBuildHaving(t *testing.T) {
 				selectField: []string{"name, age"},
 			},
 			out: outStruct{
-				cond: "SELECT name, age FROM tb WHERE (age IN (?,?,?))",
+				cond: "SELECT name, age FROM tb WHERE (age IN ($1,$2,$3))",
 				vals: []interface{}{1, 2, 3},
 				err:  nil,
 			},
@@ -127,7 +127,7 @@ func Test_BuildInsert(t *testing.T) {
 				},
 			},
 			out: outStruct{
-				cond: "INSERT INTO tb (age,foo) VALUES (?,?)",
+				cond: "INSERT INTO tb (age,foo) VALUES ($1,$2)",
 				vals: []interface{}{23, "bar"},
 				err:  nil,
 			},
@@ -166,7 +166,7 @@ func Test_BuildDelete(t *testing.T) {
 				},
 			},
 			out: outStruct{
-				cond: "DELETE FROM tb WHERE (hobby IN (?,?,?) AND sex IN (?,?) AND age>=?)",
+				cond: "DELETE FROM tb WHERE (hobby IN ($1,$2,$3) AND sex IN ($4,$5) AND age>=$6)",
 				vals: []interface{}{"soccer", "basketball", "tenis", "male", "female", 21},
 				err:  nil,
 			},
@@ -209,7 +209,7 @@ func Test_BuildUpdate(t *testing.T) {
 				},
 			},
 			out: outStruct{
-				cond: "UPDATE tb SET district=?,score=? WHERE (foo=? AND sex IN (?,?) AND age>=?)",
+				cond: "UPDATE tb SET district=$1,score=$2 WHERE (foo=$3 AND sex IN ($4,$5) AND age>=$6)",
 				vals: []interface{}{"010", 50, "bar", "male", "female", 23},
 				err:  nil,
 			},
@@ -254,7 +254,7 @@ func Test_BuildSelect(t *testing.T) {
 				fields: []string{"id", "name", "age"},
 			},
 			out: outStruct{
-				cond: "SELECT id,name,age FROM tb WHERE (foo=? AND qq=? AND age IN (?,?,?,?,?) AND faith!=?) GROUP BY department ORDER BY age DESC LIMIT 0,100",
+				cond: "SELECT id,name,age FROM tb WHERE (foo=$1 AND qq=$2 AND age IN ($3,$4,$5,$6,$7) AND faith!=$8) GROUP BY department ORDER BY age DESC LIMIT 0,100",
 				vals: []interface{}{"bar", "tt", 1, 3, 5, 7, 9, "Muslim"},
 				err:  nil,
 			},
@@ -268,7 +268,7 @@ func Test_BuildSelect(t *testing.T) {
 				fields: nil,
 			},
 			out: outStruct{
-				cond: `SELECT * FROM tb WHERE (name LIKE ?)`,
+				cond: `SELECT * FROM tb WHERE (name LIKE $1)`,
 				vals: []interface{}{"%123"},
 				err:  nil,
 			},
@@ -282,7 +282,7 @@ func Test_BuildSelect(t *testing.T) {
 				fields: nil,
 			},
 			out: outStruct{
-				cond: "SELECT * FROM tb WHERE (name=?)",
+				cond: "SELECT * FROM tb WHERE (name=$1)",
 				vals: []interface{}{"caibirdme"},
 				err:  nil,
 			},
@@ -312,7 +312,7 @@ func BenchmarkBuildSelect_Sequelization(b *testing.B) {
 }
 
 func BenchmarkBuildSelect_Parallel(b *testing.B) {
-	expectCond := "SELECT * FROM tb WHERE (foo=? AND qq=? AND age IN (?,?,?,?,?) AND faith!=?) GROUP BY department ORDER BY age DESC LIMIT 0,100"
+	expectCond := "SELECT * FROM tb WHERE (foo=$1 AND qq=$2 AND age IN ($3,$4,$5,$6,$7) AND faith!=$8) GROUP BY department ORDER BY age DESC LIMIT 0,100"
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cond, _, _ := BuildSelect("tb", map[string]interface{}{
@@ -357,7 +357,7 @@ func TestLike(t *testing.T) {
 				fields: nil,
 			},
 			out: outStruct{
-				cond: `SELECT * FROM tb WHERE (foo=? AND bar LIKE ? AND baz LIKE ?)`,
+				cond: `SELECT * FROM tb WHERE (foo=$1 AND bar LIKE $2 AND baz LIKE $3)`,
 				vals: []interface{}{1, "haha%", "%some"},
 				err:  nil,
 			},
@@ -374,7 +374,7 @@ func TestLike(t *testing.T) {
 				fields: nil,
 			},
 			out: outStruct{
-				cond: `SELECT * FROM tb WHERE (foo=? AND age IN (?,?,?,?,?) AND bar LIKE ? AND baz LIKE ?)`,
+				cond: `SELECT * FROM tb WHERE (foo=$1 AND age IN ($2,$3,$4,$5,$6) AND bar LIKE $7 AND baz LIKE $8)`,
 				vals: []interface{}{1, 1, 3, 5, 7, 9, "haha%", "%some"},
 				err:  nil,
 			},
@@ -388,7 +388,7 @@ func TestLike(t *testing.T) {
 				fields: []string{"name"},
 			},
 			out: outStruct{
-				cond: `SELECT name FROM tb WHERE (name LIKE ?)`,
+				cond: `SELECT name FROM tb WHERE (name LIKE $1)`,
 				vals: []interface{}{"%James"},
 				err:  nil,
 			},
@@ -442,7 +442,7 @@ func TestNamedQuery(t *testing.T) {
 				"name": "caibirdme",
 				"age":  24,
 			},
-			cond: `select * from tb where name=? and age<>?`,
+			cond: `select * from tb where name=$1 and age<>$2`,
 			vals: []interface{}{"caibirdme", 24},
 			err:  nil,
 		},
@@ -452,7 +452,7 @@ func TestNamedQuery(t *testing.T) {
 				"name": "caibirdme",
 				"age":  []int{1, 2, 3},
 			},
-			cond: `select * from tb where name=? and age in (?,?,?)`,
+			cond: `select * from tb where name=$1 and age in ($2,$3,$4)`,
 			vals: []interface{}{"caibirdme", 1, 2, 3},
 			err:  nil,
 		},
@@ -462,7 +462,7 @@ func TestNamedQuery(t *testing.T) {
 				"name":  "caibirdme",
 				"m_age": 88.9,
 			},
-			cond: `select * from tb where name=? and age in (select m_age from anothertb where m_age>?)`,
+			cond: `select * from tb where name=$1 and age in (select m_age from anothertb where m_age>$2)`,
 			vals: []interface{}{"caibirdme", 88.9},
 			err:  nil,
 		},
@@ -471,7 +471,7 @@ func TestNamedQuery(t *testing.T) {
 			data: map[string]interface{}{
 				"some": []float64{24.0, 28.7},
 			},
-			cond: "select * from tb where age in (?,?) and other in (?,?)",
+			cond: "select * from tb where age in ($1,$2) and other in ($3,$4)",
 			vals: []interface{}{24.0, 28.7, 24.0, 28.7},
 			err:  nil,
 		},
@@ -482,7 +482,7 @@ func TestNamedQuery(t *testing.T) {
 				"foo":   30,
 				"limit": 40,
 			},
-			cond: "select a.name,a.age from tb1 as a join tb2 as b on a.id=b.id where a.age>? and b.age<? order by a.name desc limit ?",
+			cond: "select a.name,a.age from tb1 as a join tb2 as b on a.id=b.id where a.age>$1 and b.age<$2 order by a.name desc limit $3",
 			vals: []interface{}{20, 30, 40},
 			err:  nil,
 		},
@@ -491,7 +491,7 @@ func TestNamedQuery(t *testing.T) {
 			data: map[string]interface{}{
 				"age": []int{1},
 			},
-			cond: `select * from tb where age in (?)`,
+			cond: `select * from tb where age in ($1)`,
 			vals: []interface{}{1},
 			err:  nil,
 		},
@@ -536,7 +536,7 @@ func Test_BuildIN(t *testing.T) {
 				fields: []string{"id", "name", "age"},
 			},
 			out: outStruct{
-				cond: "SELECT id,name,age FROM tb WHERE (foo=? AND qq=? AND age IN (?,?,?,?,?) AND faith!=?) GROUP BY department ORDER BY age DESC",
+				cond: "SELECT id,name,age FROM tb WHERE (foo=$1 AND qq=$2 AND age IN ($3,$4,$5,$6,$7) AND faith!=$8) GROUP BY department ORDER BY age DESC",
 				vals: []interface{}{"bar", "tt", 1, 3, 5, 7, 9, "Muslim"},
 				err:  nil,
 			},
@@ -585,7 +585,7 @@ func Test_BuildOrderBy(t *testing.T) {
 				fields: []string{"id", "name", "age"},
 			},
 			out: outStruct{
-				cond: "SELECT id,name,age FROM tb WHERE (foo=?) ORDER BY age DESC,id ASC",
+				cond: "SELECT id,name,age FROM tb WHERE (foo=$1) ORDER BY age DESC,id ASC",
 				vals: []interface{}{"bar"},
 				err:  nil,
 			},

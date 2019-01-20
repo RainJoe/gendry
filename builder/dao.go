@@ -19,12 +19,12 @@ var defaultSortAlgorithm = sort.Strings
 
 //Comparable requires type implements the Build method
 type Comparable interface {
-	Build() ([]string, []interface{})
+	Build(placeHolderIndex *int) ([]string, []interface{})
 }
 
 type nilComparable byte
 
-func (n nilComparable) Build() ([]string, []interface{}) {
+func (n nilComparable) Build(placeHolderIndex *int) ([]string, []interface{}) {
 	return nil, nil
 }
 
@@ -32,7 +32,7 @@ func (n nilComparable) Build() ([]string, []interface{}) {
 type Like map[string]interface{}
 
 // Build implements the Comparable interface
-func (l Like) Build() ([]string, []interface{}) {
+func (l Like) Build(placeHolderIndex *int) ([]string, []interface{}) {
 	if nil == l || 0 == len(l) {
 		return nil, nil
 	}
@@ -44,7 +44,8 @@ func (l Like) Build() ([]string, []interface{}) {
 	defaultSortAlgorithm(cond)
 	for j := 0; j < len(cond); j++ {
 		val := l[cond[j]]
-		cond[j] = cond[j] + " LIKE ?"
+		*placeHolderIndex++
+		cond[j] = cond[j] + " LIKE $" + fmt.Sprintf("%d", *placeHolderIndex)
 		vals = append(vals, val)
 	}
 	return cond, vals
@@ -54,55 +55,55 @@ func (l Like) Build() ([]string, []interface{}) {
 type Eq map[string]interface{}
 
 //Build implements the Comparable interface
-func (e Eq) Build() ([]string, []interface{}) {
-	return build(e, "=")
+func (e Eq) Build(placeHolderIndex *int) ([]string, []interface{}) {
+	return build(e, "=", placeHolderIndex)
 }
 
 //Ne means Not Equal(!=)
 type Ne map[string]interface{}
 
 //Build implements the Comparable interface
-func (n Ne) Build() ([]string, []interface{}) {
-	return build(n, "!=")
+func (n Ne) Build(placeHolderIndex *int) ([]string, []interface{}) {
+	return build(n, "!=", placeHolderIndex)
 }
 
 //Lt means less than(<)
 type Lt map[string]interface{}
 
 //Build implements the Comparable interface
-func (l Lt) Build() ([]string, []interface{}) {
-	return build(l, "<")
+func (l Lt) Build(placeHolderIndex *int) ([]string, []interface{}) {
+	return build(l, "<", placeHolderIndex)
 }
 
 //Lte means less than or equal(<=)
 type Lte map[string]interface{}
 
 //Build implements the Comparable interface
-func (l Lte) Build() ([]string, []interface{}) {
-	return build(l, "<=")
+func (l Lte) Build(placeHolderIndex *int) ([]string, []interface{}) {
+	return build(l, "<=", placeHolderIndex)
 }
 
 //Gt means greater than(>)
 type Gt map[string]interface{}
 
 //Build implements the Comparable interface
-func (g Gt) Build() ([]string, []interface{}) {
-	return build(g, ">")
+func (g Gt) Build(placeHolderIndex *int) ([]string, []interface{}) {
+	return build(g, ">", placeHolderIndex)
 }
 
 //Gte means greater than or equal(>=)
 type Gte map[string]interface{}
 
 //Build implements the Comparable interface
-func (g Gte) Build() ([]string, []interface{}) {
-	return build(g, ">=")
+func (g Gte) Build(placeHolderIndex *int) ([]string, []interface{}) {
+	return build(g, ">=", placeHolderIndex)
 }
 
 //In means in
 type In map[string][]interface{}
 
 //Build implements the Comparable interface
-func (i In) Build() ([]string, []interface{}) {
+func (i In) Build(placeHolderIndex *int) ([]string, []interface{}) {
 	if nil == i || 0 == len(i) {
 		return nil, nil
 	}
@@ -114,19 +115,28 @@ func (i In) Build() ([]string, []interface{}) {
 	defaultSortAlgorithm(cond)
 	for j := 0; j < len(cond); j++ {
 		val := i[cond[j]]
-		cond[j] = buildIn(cond[j], val)
+		cond[j] = buildIn(cond[j], val, placeHolderIndex)
 		vals = append(vals, val...)
 	}
 	return cond, vals
 }
 
-func buildIn(field string, vals []interface{}) (cond string) {
-	cond = strings.TrimRight(strings.Repeat("?,", len(vals)), ",")
+func buildIn(field string, vals []interface{}, placeHolderIndex *int) (cond string) {
+	//cond = strings.TrimRight(strings.Repeat("?,", len(vals)), ",")
+	// cond = "("
+	for i := 0; i < len(vals); i++ {
+		*placeHolderIndex++
+		cond += fmt.Sprintf("$%d", *placeHolderIndex)
+		if i != len(vals)-1 {
+			cond += ","
+		}
+	}
+	// cond += ")"
 	cond = fmt.Sprintf("%s IN (%s)", quoteField(field), cond)
 	return
 }
 
-func build(m map[string]interface{}, op string) ([]string, []interface{}) {
+func build(m map[string]interface{}, op string, placeHolderIndex *int) ([]string, []interface{}) {
 	if nil == m || 0 == len(m) {
 		return nil, nil
 	}
@@ -141,13 +151,14 @@ func build(m map[string]interface{}, op string) ([]string, []interface{}) {
 	defaultSortAlgorithm(cond)
 	for i = 0; i < length; i++ {
 		vals[i] = m[cond[i]]
-		cond[i] = assembleExpression(cond[i], op)
+		*placeHolderIndex++
+		cond[i] = assembleExpression(cond[i], op, placeHolderIndex)
 	}
 	return cond, vals
 }
 
-func assembleExpression(field, op string) string {
-	return quoteField(field) + op + "?"
+func assembleExpression(field, op string, placeHolderIndex *int) string {
+	return quoteField(field) + op + "$" + fmt.Sprintf("%d", *placeHolderIndex)
 }
 
 func orderBy(orderMap []eleOrderBy) (string, error) {
@@ -184,14 +195,14 @@ func resolveFields(m map[string]interface{}) []string {
 	return fields
 }
 
-func whereConnector(conditions ...Comparable) (string, []interface{}) {
+func whereConnector(placeHolderIndex *int, conditions ...Comparable) (string, []interface{}) {
 	if len(conditions) == 0 {
 		return "", nil
 	}
 	var where []string
 	var values []interface{}
 	for _, cond := range conditions {
-		cons, vals := cond.Build()
+		cons, vals := cond.Build(placeHolderIndex)
 		if nil == cons {
 			continue
 		}
@@ -218,7 +229,7 @@ func buildInsert(table string, setMap []map[string]interface{}) (string, []inter
 		return "", nil, errInsertNullData
 	}
 	fields = resolveFields(setMap[0])
-	placeholder := "(" + strings.TrimRight(strings.Repeat("?,", len(fields)), ",") + ")"
+	placeholder := "(" + strings.TrimRight(strings.Repeat("$%d,", len(fields)), ",") + ")"
 	var sets []string
 	for _, mapItem := range setMap {
 		sets = append(sets, placeholder)
@@ -230,19 +241,27 @@ func buildInsert(table string, setMap []map[string]interface{}) (string, []inter
 			vals = append(vals, val)
 		}
 	}
-	return fmt.Sprintf(format, quoteField(table), strings.Join(fields, ","), strings.Join(sets, ",")), vals, nil
+	conds := fmt.Sprintf(format, quoteField(table), strings.Join(fields, ","), strings.Join(sets, ","))
+	var holders []interface{}
+	for i := 0; i < len(fields)*len(sets); i++ {
+		holders = append(holders, i+1)
+	}
+	conds = fmt.Sprintf(conds, holders...)
+	return conds, vals, nil
 }
 
 func buildUpdate(table string, update map[string]interface{}, conditions ...Comparable) (string, []interface{}, error) {
+	var placeHolderIndex int
 	format := "UPDATE %s SET %s"
 	keys, vals := resolveKV(update)
 	var sets string
 	for _, k := range keys {
-		sets += fmt.Sprintf("%s=?,", quoteField(k))
+		placeHolderIndex++
+		sets += fmt.Sprintf("%s=$%d,", quoteField(k), placeHolderIndex)
 	}
 	sets = strings.TrimRight(sets, ",")
 	cond := fmt.Sprintf(format, quoteField(table), sets)
-	whereString, whereVals := whereConnector(conditions...)
+	whereString, whereVals := whereConnector(&placeHolderIndex, conditions...)
 	if "" != whereString {
 		cond = fmt.Sprintf("%s WHERE %s", cond, whereString)
 		vals = append(vals, whereVals...)
@@ -251,7 +270,8 @@ func buildUpdate(table string, update map[string]interface{}, conditions ...Comp
 }
 
 func buildDelete(table string, conditions ...Comparable) (string, []interface{}, error) {
-	whereString, vals := whereConnector(conditions...)
+	var placeHolderIndex int
+	whereString, vals := whereConnector(&placeHolderIndex, conditions...)
 	if "" == whereString {
 		return fmt.Sprintf("DELETE FROM %s", table), nil, nil
 	}
@@ -277,6 +297,7 @@ func splitCondition(conditions []Comparable) ([]Comparable, []Comparable) {
 }
 
 func buildSelect(table string, ufields []string, groupBy string, uOrderBy []eleOrderBy, limit *eleLimit, conditions ...Comparable) (string, []interface{}, error) {
+	var placeHolderIndex int
 	format := "SELECT %s FROM %s"
 	fields := "*"
 	if len(ufields) > 0 {
@@ -287,7 +308,7 @@ func buildSelect(table string, ufields []string, groupBy string, uOrderBy []eleO
 	}
 	cond := fmt.Sprintf(format, fields, quoteField(table))
 	where, having := splitCondition(conditions)
-	whereString, vals := whereConnector(where...)
+	whereString, vals := whereConnector(&placeHolderIndex, where...)
 	if "" != whereString {
 		cond = fmt.Sprintf("%s WHERE %s", cond, whereString)
 	}
@@ -295,7 +316,7 @@ func buildSelect(table string, ufields []string, groupBy string, uOrderBy []eleO
 		cond = fmt.Sprintf("%s GROUP BY %s", cond, quoteField(groupBy))
 	}
 	if nil != having {
-		havingString, havingVals := whereConnector(having...)
+		havingString, havingVals := whereConnector(&placeHolderIndex, having...)
 		cond = fmt.Sprintf("%s HAVING %s", cond, havingString)
 		vals = append(vals, havingVals...)
 	}

@@ -358,13 +358,14 @@ func splitOrderBy(orderby string) ([]eleOrderBy, error) {
 }
 
 const (
-	paramPlaceHolder = "?"
+	paramPlaceHolder = "$"
 )
 
 var searchHandle = regexp.MustCompile(`{{\S+}}`)
 
 // NamedQuery is used for expressing complex query
 func NamedQuery(sql string, data map[string]interface{}) (string, []interface{}, error) {
+	var placeHolderIndex int
 	length := len(data)
 	if length == 0 {
 		return sql, nil, nil
@@ -381,13 +382,14 @@ func NamedQuery(sql string, data map[string]interface{}) (string, []interface{},
 		v := reflect.ValueOf(val)
 		if v.Type().Kind() != reflect.Slice {
 			vals = append(vals, val)
-			return paramPlaceHolder
+			placeHolderIndex++
+			return paramPlaceHolder + fmt.Sprintf("%d", placeHolderIndex)
 		}
 		length := v.Len()
 		for i := 0; i < length; i++ {
 			vals = append(vals, v.Index(i).Interface())
 		}
-		return createMultiPlaceholders(length)
+		return createMultiPlaceholders(length, &placeHolderIndex)
 	})
 	if nil != err {
 		return "", nil, err
@@ -395,20 +397,17 @@ func NamedQuery(sql string, data map[string]interface{}) (string, []interface{},
 	return cond, vals, nil
 }
 
-func createMultiPlaceholders(num int) string {
+func createMultiPlaceholders(num int, placeHolderIndex *int) string {
 	if 0 == num {
 		return ""
 	}
-	length := (num << 1) | 1
-	buff := make([]byte, length)
-	buff[0], buff[length-1] = '(', ')'
-	ll := length - 2
-	for i := 1; i <= ll; i += 2 {
-		buff[i] = '?'
+	placeHolder := "("
+	for i := 0; i < num; i++ {
+		*placeHolderIndex++
+		placeHolder += fmt.Sprintf("$%d", *placeHolderIndex)
+		if i != num-1 {
+			placeHolder += ","
+		}
 	}
-	ll = length - 3
-	for i := 2; i <= ll; i += 2 {
-		buff[i] = ','
-	}
-	return string(buff)
+	return placeHolder + ")"
 }
