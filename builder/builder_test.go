@@ -254,7 +254,7 @@ func Test_BuildSelect(t *testing.T) {
 				fields: []string{"id", "name", "age"},
 			},
 			out: outStruct{
-				cond: "SELECT id,name,age FROM tb WHERE (foo=$1 AND qq=$2 AND age IN ($3,$4,$5,$6,$7) AND faith!=$8) GROUP BY department ORDER BY age DESC LIMIT 0,100",
+				cond: "SELECT id,name,age FROM tb WHERE (foo=$1 AND qq=$2 AND age IN ($3,$4,$5,$6,$7) AND faith!=$8) GROUP BY department ORDER BY age DESC LIMIT 0 OFFSET 100",
 				vals: []interface{}{"bar", "tt", 1, 3, 5, 7, 9, "Muslim"},
 				err:  nil,
 			},
@@ -312,7 +312,7 @@ func BenchmarkBuildSelect_Sequelization(b *testing.B) {
 }
 
 func BenchmarkBuildSelect_Parallel(b *testing.B) {
-	expectCond := "SELECT * FROM tb WHERE (foo=$1 AND qq=$2 AND age IN ($3,$4,$5,$6,$7) AND faith!=$8) GROUP BY department ORDER BY age DESC LIMIT 0,100"
+	expectCond := "SELECT * FROM tb WHERE (foo=$1 AND qq=$2 AND age IN ($3,$4,$5,$6,$7) AND faith!=$8) GROUP BY department ORDER BY age DESC LIMIT 0 OFFSET 100"
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cond, _, _ := BuildSelect("tb", map[string]interface{}{

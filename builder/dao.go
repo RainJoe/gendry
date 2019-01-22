@@ -122,8 +122,6 @@ func (i In) Build(placeHolderIndex *int) ([]string, []interface{}) {
 }
 
 func buildIn(field string, vals []interface{}, placeHolderIndex *int) (cond string) {
-	//cond = strings.TrimRight(strings.Repeat("?,", len(vals)), ",")
-	// cond = "("
 	for i := 0; i < len(vals); i++ {
 		*placeHolderIndex++
 		cond += fmt.Sprintf("$%d", *placeHolderIndex)
@@ -131,7 +129,6 @@ func buildIn(field string, vals []interface{}, placeHolderIndex *int) (cond stri
 			cond += ","
 		}
 	}
-	// cond += ")"
 	cond = fmt.Sprintf("%s IN (%s)", quoteField(field), cond)
 	return
 }

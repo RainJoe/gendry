@@ -307,7 +307,7 @@ func TestBuildSelect(t *testing.T) {
 				step:  20,
 			},
 			outErr:  nil,
-			outStr:  "SELECT foo,bar FROM tb WHERE (bar=$1 AND foo=$2 AND qq IN ($3,$4,$5)) ORDER BY foo DESC LIMIT 10,20",
+			outStr:  "SELECT foo,bar FROM tb WHERE (bar=$1 AND foo=$2 AND qq IN ($3,$4,$5)) ORDER BY foo DESC LIMIT 10 OFFSET 20",
 			outVals: []interface{}{2, 1, 4, 5, 6},
 		},
 	}
